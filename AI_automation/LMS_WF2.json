@@ -1,0 +1,194 @@
+{
+  "name": "LMS_WF2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -336,
+        -32
+      ],
+      "id": "8fad2cfe-ad1a-4abb-9b4c-d40e9551784f",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    s.full_name, \n    s.email, \n    b.title, \n    ir.return_date \nFROM issue_records ir\nJOIN students s ON ir.student_id = s.id\nJOIN books b ON ir.book_id = b.id\nWHERE ir.return_date = CURRENT_DATE \nAND ir.status = 'issued';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -96,
+        -32
+      ],
+      "id": "306d9320-5815-4330-b709-32794d1ecc69",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "qIj80pjEta8BUvRI",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e14f2843-c933-41a0-beb9-73b02341e11e",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        192,
+        0
+      ],
+      "id": "03de963a-0998-48ce-a069-247617613de6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "full_name",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        304,
+        -192
+      ],
+      "id": "697d9b54-915f-4ffc-aa3d-10cc32741b9b",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3-8b-8192\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful library assistant. Write a short, 2-sentence return reminder.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Write a friendly email to {{ $json.full_name }}. Their book '{{ $json.title }}' is due today. Ask them to return it by 4 PM.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        544,
+        -192
+      ],
+      "id": "efbb0874-f353-46fc-a867-84f4133b34a2",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tVtAX9Qx7lkL2emj",
+          "name": "Header Auth account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "HTTP Request": [
+      {
+        "json": {
+          "name": "First item",
+          "code": 1
+        }
+      },
+      {
+        "json": {
+          "name": "Second item",
+          "code": 2
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f8e27d35-088e-4dbf-82dd-d84e8fb8a030",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af3831c7c734ee453f876f97884406e81f3e66c9a615284647eca608e35d2057"
+  },
+  "id": "q2sCBSPI3P5bfpC1",
+  "tags": []
+}

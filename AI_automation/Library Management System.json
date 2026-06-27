@@ -1,0 +1,264 @@
+{
+  "name": "Library Management System",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "issue-book",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -672,
+        -240
+      ],
+      "id": "67cc3675-03e8-4881-91c0-a2067ddb7883",
+      "name": "Webhook",
+      "webhookId": "48f0b137-b7b7-4a28-b54f-2478f0069a50",
+      "alwaysOutputData": false,
+      "retryOnFail": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c7f4379d-9237-48b6-8afe-9cc379e3c7bd",
+              "name": "return_date",
+              "value": "={{ new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "13a21f75-a1e1-4128-9d7b-f891c4a7b158",
+              "name": "issue_date",
+              "value": "={{ new Date().toISOString().split('T')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "291b4090-23a3-4bd5-9ec2-6e86cd1a29f8",
+              "name": "book_id",
+              "value": "={{ $json.body.admin_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4d6fcd11-ef75-444b-a560-e325cbf4707a",
+              "name": "student_name",
+              "value": "={{ $json.body.student_name }}",
+              "type": "string"
+            },
+            {
+              "id": "8d95dbba-1bac-4380-bf2f-55d12abfed27",
+              "name": "student_email",
+              "value": "={{ $json.body.student_email }}",
+              "type": "string"
+            },
+            {
+              "id": "a2f111a3-300a-468f-ae80-e7e193faa99e",
+              "name": "book_title",
+              "value": "={{ $json.body.book_title }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -528,
+        -448
+      ],
+      "id": "adf0d616-d698-4218-9404-d6a8bb4d514c",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO issue_records (student_id, book_id, issued_by, issue_date, return_date, status)\nVALUES (\n  $1, $2, $3, $4, $5, 'issued'\n)",
+        "options": {
+          "queryReplacement": "={{ $json.body.student_id }},{{ $json.body.book_id }},{{ $json.body.admin_id }},{{ $json.issue_date }},{{ $json.return_date }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -368,
+        -240
+      ],
+      "id": "48309813-5ccd-4e39-9403-10ac7bef77b1",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "qIj80pjEta8BUvRI",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE books SET available = false WHERE id = $1",
+        "options": {
+          "queryReplacement": "={{ $('Webhook').item.json.body.book_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -144,
+        -240
+      ],
+      "id": "a755b69e-f4c0-4b23-abcb-a43cf5d0cc49",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "qIj80pjEta8BUvRI",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "=json",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Write a polite library book issue confirmation email for student {{ $('Webhook').item.json.body.student_name }}. They have been issued the book {{ $('Webhook').item.json.body.book_title }}. The return date is {{ $('Edit Fields').item.json.return_date }}. Keep it under 80 words. Return only email body.\"\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 200\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 4000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        -448
+      ],
+      "id": "fda0f604-530f-4cc8-958b-2f787e152f30",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "KVuPY5uXmSoXmadx",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.student_email }}",
+        "subject": "=Library Book Issue Confirmation - {{ $('Webhook').item.json.body.book_title }}",
+        "message": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        176,
+        -448
+      ],
+      "id": "81ac7c21-2cf9-4a10-858c-ae0eee0c19a2",
+      "name": "Send a message",
+      "webhookId": "65a33b97-029e-43f4-8357-cd5b2bdfa9f2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "kGGhJzweQZgNaQ5f",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "87e2ca28-79d1-4373-8561-f7fc53f94861",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af3831c7c734ee453f876f97884406e81f3e66c9a615284647eca608e35d2057"
+  },
+  "id": "SbJPmrl0SV6kEW0W",
+  "tags": []
+}

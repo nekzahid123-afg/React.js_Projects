@@ -1,0 +1,240 @@
+{
+  "name": "LMS - WF4 - Return Book",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "return-book",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -352,
+        -128
+      ],
+      "id": "37a86f89-32f5-4a80-9e69-6cc25afb6876",
+      "name": "Webhook",
+      "webhookId": "3226f228-5f79-4c0d-a0ac-9d8f93e5b8b8"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE issue_records SET status = 'returned' WHERE id = $1",
+        "options": {
+          "queryReplacement": "={{ $json.body.record_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -240,
+        -384
+      ],
+      "id": "2f51e4b2-bda4-451e-a123-892d4e07582b",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "qIj80pjEta8BUvRI",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE books SET available = true WHERE id = $1",
+        "options": {
+          "queryReplacement": "={{ $('Webhook').item.json.body.book_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -80,
+        -384
+      ],
+      "id": "98227a52-985b-43a9-9e1e-3e37e049c0b0",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "qIj80pjEta8BUvRI",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT w.*, s.email as student_email, s.full_name as student_name, b.title as book_title\nFROM waitlist w\nJOIN students s ON w.student_id = s.id\nJOIN books b ON w.book_id = b.id\nWHERE w.book_id = $1\nORDER BY w.created_at ASC\nLIMIT 1",
+        "options": {
+          "queryReplacement": "={{ $('Webhook').item.json.body.book_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        80,
+        -384
+      ],
+      "id": "901fe95a-dc46-4fba-b88b-8bed51a20e54",
+      "name": "Execute a SQL query2",
+      "credentials": {
+        "postgres": {
+          "id": "qIj80pjEta8BUvRI",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.student_email }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    },
+                    "id": "4568fc21-266d-403b-a765-680304972525"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        -144
+      ],
+      "id": "4a03a49f-4cb7-4828-9329-65fdfd0525ec",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.student_email }}",
+        "subject": "=Book Available - {{ $json.book_title }}",
+        "message": "=Dear {{ $json.student_name }}, the book {{ $json.book_title }} is now available in the library. Please collect it within 24 hours; otherwise, your reservation will be cancelled.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        -144
+      ],
+      "id": "1db01514-d191-40a5-ac98-4f5a6b57e75a",
+      "name": "Send a message",
+      "webhookId": "b2684cab-64b4-4e1d-b8b1-225cc449a390",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "kGGhJzweQZgNaQ5f",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Send a message": [
+      {
+        "json": {
+          "name": "First item",
+          "code": 1
+        }
+      },
+      {
+        "json": {
+          "name": "Second item",
+          "code": 2
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query2": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "09bb2139-9128-421c-b497-0870d3899232",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af3831c7c734ee453f876f97884406e81f3e66c9a615284647eca608e35d2057"
+  },
+  "id": "TgNMctT9dENIUhmr",
+  "tags": []
+}
